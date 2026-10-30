@@ -194,6 +194,7 @@ export const MalaManagerModal: React.FC<MalaManagerModalProps> = ({
         beadMaterial: formMaterial,
         targetMalas: Math.max(1, formTarget),
         colorTheme: formColor,
+        isCustom: editingMala.isCustom ?? true,
         updatedAt: Date.now(),
       };
       onSaveMala(updated, false);
@@ -214,6 +215,7 @@ export const MalaManagerModal: React.FC<MalaManagerModalProps> = ({
         colorTheme: formColor,
         order: malas.length + 1,
         isActive: true,
+        isCustom: true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         lastChantedAt: Date.now(),

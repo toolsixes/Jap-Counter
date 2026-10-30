@@ -2,6 +2,7 @@ export type BeadMaterial = 'rudraksha' | 'tulsi' | 'sandalwood' | 'sphatik' | 'g
 
 export interface MalaTrack {
   id: string;
+  userId?: string;
   title: string;
   mantraText: string;
   meaning?: string;
@@ -15,6 +16,7 @@ export interface MalaTrack {
   colorTheme: string; // Accent color hex
   order?: number;
   isActive?: boolean;
+  isCustom?: boolean; // user-created
   createdAt: number;
   updatedAt: number;
   lastChantedAt: number;

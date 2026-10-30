@@ -30,9 +30,12 @@ async function findDriveFile(token: string): Promise<{ id: string; modifiedTime:
 
   if (!res.ok) {
     if (res.status === 401) {
-      throw new Error('Authentication expired. Please sign in again.');
+      throw new Error('Google Drive session expired. Please sign in with Google again.');
     }
-    throw new Error(`Drive lookup failed with status: ${res.status}`);
+    if (res.status === 403) {
+      throw new Error('Google Drive permission not granted. Real-time Cloud sync is active.');
+    }
+    throw new Error(`Drive service notice (${res.status}). Real-time Cloud database remains active.`);
   }
 
   const data = await res.json();

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Flame, Award, Target, TrendingUp, BarChart2, PlusCircle } from 'lucide-react';
-import { JaapEntry, Mantra, MalaTrack, UserSettings, DEFAULT_MANTRAS } from '../types/jaap';
+import { JaapEntry, Mantra, MalaTrack, UserSettings, DEFAULT_MANTRAS, DEFAULT_MALA_TRACKS } from '../types/jaap';
 
 interface DashboardProps {
   entries: JaapEntry[];
@@ -117,44 +117,65 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const areaD = `${pathD} L ${points[points.length - 1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`;
 
-  // Mala breakdown strictly for active concurrent malas
-  const breakdownList = useMemo(() => {
-    const activeMalas = (allMalas && allMalas.length > 0 ? allMalas : []).filter(
-      (m) => m.isActive !== false
-    );
+  // Only show the mantras/malas that have been created by the user
+  const userCreatedList = useMemo(() => {
+    const defaultMalaIds = new Set(DEFAULT_MALA_TRACKS.map((d) => d.id));
+    const defaultMantraIds = new Set(DEFAULT_MANTRAS.map((d) => d.id));
+    const defaultTitles = new Set([
+      ...DEFAULT_MALA_TRACKS.map((d) => d.title.toLowerCase()),
+      ...DEFAULT_MANTRAS.map((d) => d.name.toLowerCase()),
+    ]);
+
     const map = new Map<string, { id: string; name: string; count: number; color?: string }>();
 
-    // 1. Initialize strictly from concurrent malas
-    activeMalas.forEach((m) => {
-      map.set(m.id, {
-        id: m.id,
-        name: m.title,
-        count: 0,
-        color: m.colorTheme,
-      });
+    // 1. Gather all user-created malas from allMalas
+    allMalas.forEach((m) => {
+      const isUserCreated = m.isCustom === true || !defaultMalaIds.has(m.id);
+      if (isUserCreated && m.isActive !== false) {
+        map.set(m.id, {
+          id: m.id,
+          name: m.title,
+          count: 0,
+          color: m.colorTheme,
+        });
+      }
     });
 
-    // 2. Tally entries matching concurrent malas
+    // 2. Also check entries for any custom user mantras not in defaults
     entries.forEach((e) => {
       if (!e.deleted && e.count > 0) {
-        let targetKey = e.malaId && map.has(e.malaId)
-          ? e.malaId
-          : e.mantraId && map.has(e.mantraId)
-          ? e.mantraId
-          : null;
+        const isCustomMala = e.malaId && !defaultMalaIds.has(e.malaId);
+        const isCustomMantra =
+          (e.mantraId && !defaultMantraIds.has(e.mantraId)) ||
+          (e.mantraName && !defaultTitles.has(e.mantraName.toLowerCase()));
 
-        if (!targetKey && e.mantraName) {
-          for (const [k, v] of map.entries()) {
-            if (v.name.toLowerCase() === e.mantraName.toLowerCase()) {
-              targetKey = k;
-              break;
+        if (isCustomMala || isCustomMantra) {
+          let targetKey = e.malaId && map.has(e.malaId)
+            ? e.malaId
+            : e.mantraId && map.has(e.mantraId)
+            ? e.mantraId
+            : null;
+
+          if (!targetKey && e.mantraName) {
+            for (const [k, v] of map.entries()) {
+              if (v.name.toLowerCase() === e.mantraName.toLowerCase()) {
+                targetKey = k;
+                break;
+              }
             }
           }
-        }
 
-        if (targetKey) {
-          const item = map.get(targetKey)!;
-          item.count += e.count;
+          if (targetKey) {
+            const item = map.get(targetKey)!;
+            item.count += e.count;
+          } else if (e.mantraName && !defaultTitles.has(e.mantraName.toLowerCase())) {
+            map.set(e.mantraId || e.malaId || e.mantraName, {
+              id: e.mantraId || e.malaId || e.mantraName,
+              name: e.mantraName,
+              count: e.count,
+              color: '#F59E0B',
+            });
+          }
         }
       }
     });
@@ -163,6 +184,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     items.sort((a, b) => b.count - a.count);
     return items;
   }, [allMalas, entries]);
+
+  const userCreatedTotalChants = useMemo(() => {
+    return userCreatedList.reduce((sum, item) => sum + item.count, 0);
+  }, [userCreatedList]);
 
 
   return (
@@ -341,52 +366,70 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Mantra Breakdown */}
+      {/* User-Created Mantras Breakdown */}
       <div className="p-4 rounded-2xl bg-[#14161F] border border-[#232736]">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-amber-500" />
-            <h3 className="text-xs font-bold text-gray-200">Mantra Breakdown</h3>
+            <h3 className="text-xs font-bold text-gray-200">User-Created Mantras</h3>
           </div>
           <span className="text-[11px] text-gray-400 font-medium">
-            {totalLifetimeChants} Lifetime Chants
+            {userCreatedTotalChants} Chants
           </span>
         </div>
 
-        <div className="space-y-3">
-          {breakdownList.map((item) => {
-            const count = item.count;
-            const pct = totalLifetimeChants > 0 ? Math.round((count / totalLifetimeChants) * 100) : 0;
+        {userCreatedList.length === 0 ? (
+          <div className="py-6 px-3 text-center rounded-xl bg-[#10121A] border border-dashed border-[#232636] space-y-2">
+            <p className="text-xs text-gray-300 font-medium">No user-created mantras yet</p>
+            <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
+              Any custom mantras and sadhana tracks you create will be tracked here with dedicated analytics.
+            </p>
+            {onOpenManualModal && (
+              <button
+                onClick={onOpenManualModal}
+                className="mt-1 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>+ Add Custom Mantra Chants</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {userCreatedList.map((item) => {
+              const count = item.count;
+              const pct = userCreatedTotalChants > 0 ? Math.round((count / userCreatedTotalChants) * 100) : 100;
 
-            return (
-              <div key={item.id} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 truncate max-w-[190px]">
-                    {item.color && (
-                      <div
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                    )}
-                    <span className="text-gray-300 font-medium truncate">{item.name}</span>
+              return (
+                <div key={item.id} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 truncate max-w-[190px]">
+                      {item.color && (
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                      )}
+                      <span className="text-gray-300 font-medium truncate">{item.name}</span>
+                    </div>
+                    <span className="text-gray-400 font-mono text-[11px] shrink-0">
+                      {count} chants ({pct}%)
+                    </span>
                   </div>
-                  <span className="text-gray-400 font-mono text-[11px] shrink-0">
-                    {count} chants ({pct}%)
-                  </span>
+                  <div className="w-full bg-[#1C1F2B] h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${pct}%`,
+                        backgroundColor: item.color || '#F59E0B',
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-[#1C1F2B] h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{
-                      width: `${pct}%`,
-                      backgroundColor: item.color || '#F59E0B',
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Quick Add Entry slot */}

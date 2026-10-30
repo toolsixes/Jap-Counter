@@ -19,6 +19,7 @@
         "colorTheme": { "type": "string", "maxLength": 32 },
         "order": { "type": "number" },
         "isActive": { "type": "boolean" },
+        "isCustom": { "type": "boolean" },
         "lastChantedAt": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }

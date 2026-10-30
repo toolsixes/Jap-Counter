@@ -13,22 +13,26 @@ provider.addScope('https://www.googleapis.com/auth/drive.file');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
+let currentAuthSuccess: ((user: User, token?: string | null) => void) | null = null;
+let currentAuthFailure: (() => void) | null = null;
 
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User, token?: string | null) => void,
   onAuthFailure?: () => void
 ) => {
+  currentAuthSuccess = onAuthSuccess || null;
+  currentAuthFailure = onAuthFailure || null;
+
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        // Token might need a fresh interactive sign-in or we wait for sign-in action
-        if (onAuthFailure) onAuthFailure();
+      if (onAuthSuccess) {
+        onAuthSuccess(user, cachedAccessToken);
       }
     } else {
       cachedAccessToken = null;
-      if (onAuthFailure) onAuthFailure();
+      if (onAuthFailure) {
+        onAuthFailure();
+      }
     }
   });
 };
@@ -38,12 +42,13 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Failed to obtain Google Drive access token from sign-in');
+    cachedAccessToken = credential?.accessToken || null;
+
+    if (currentAuthSuccess && result.user) {
+      currentAuthSuccess(result.user, cachedAccessToken);
     }
 
-    cachedAccessToken = credential.accessToken;
-    return { user: result.user, accessToken: cachedAccessToken };
+    return { user: result.user, accessToken: cachedAccessToken || '' };
   } catch (error: any) {
     const errorCode = error?.code || '';
     // Benign user cancellations - do not throw or log as errors
@@ -74,4 +79,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 export const logout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  if (currentAuthFailure) {
+    currentAuthFailure();
+  }
 };

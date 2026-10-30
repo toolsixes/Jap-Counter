@@ -33,6 +33,7 @@ service cloud.firestore {
              (!('totalChantsLifetime' in data) || data.totalChantsLifetime is number) &&
              (!('totalChantsToday' in data) || data.totalChantsToday is number) &&
              (!('colorTheme' in data) || (data.colorTheme is string && data.colorTheme.size() <= 32)) &&
+             (!('isCustom' in data) || data.isCustom is bool) &&
              (!('isActive' in data) || data.isActive is bool);
     }
 
