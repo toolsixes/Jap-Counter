@@ -1,0 +1,91 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidMalaTrack(data, userId) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId == userId &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 128 &&
+             data.mantraText is string && data.mantraText.size() > 0 && data.mantraText.size() <= 500 &&
+             (!('meaning' in data) || (data.meaning is string && data.meaning.size() <= 500)) &&
+             (!('beadMaterial' in data) || data.beadMaterial in ['rudraksha', 'tulsi', 'sandalwood', 'sphatik', 'gold']) &&
+             data.targetMalas is number && data.targetMalas >= 1 &&
+             data.currentBead is number && data.currentBead >= 0 && data.currentBead <= 108 &&
+             (!('completedMalasToday' in data) || data.completedMalasToday is number) &&
+             (!('totalChantsLifetime' in data) || data.totalChantsLifetime is number) &&
+             (!('totalChantsToday' in data) || data.totalChantsToday is number) &&
+             (!('colorTheme' in data) || (data.colorTheme is string && data.colorTheme.size() <= 32)) &&
+             (!('isActive' in data) || data.isActive is bool);
+    }
+
+    function isValidJaapEntry(data, userId) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId == userId &&
+             data.malaId is string && isValidId(data.malaId) &&
+             data.count is number && data.count > 0 &&
+             data.malas is number && data.malas >= 0 &&
+             data.type in ['live', 'manual'] &&
+             data.timestamp is number &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 500)) &&
+             (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() <= 128)) &&
+             (!('deleted' in data) || data.deleted is bool);
+    }
+
+    // User Mala Sadhana Tracks & Logs (Isolated per authenticated user)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Concurrent Malas Collection
+      match /malas/{malaId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(malaId) &&
+                         isValidMalaTrack(request.resource.data, userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(malaId) &&
+                         isValidMalaTrack(request.resource.data, userId) &&
+                         request.resource.data.id == resource.data.id &&
+                         request.resource.data.userId == resource.data.userId;
+
+        allow delete: if isOwner(userId);
+      }
+
+      // Chant Entries Collection
+      match /entries/{entryId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(entryId) &&
+                         isValidJaapEntry(request.resource.data, userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(entryId) &&
+                         isValidJaapEntry(request.resource.data, userId) &&
+                         request.resource.data.id == resource.data.id &&
+                         request.resource.data.userId == resource.data.userId;
+
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

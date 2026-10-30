@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "MalaTrack": {
+      "title": "MalaTrack",
+      "description": "An independent Mala sadhana track with dedicated counters, bead progress, and target goals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "mantraText": { "type": "string", "maxLength": 500 },
+        "meaning": { "type": "string", "maxLength": 500 },
+        "beadMaterial": { "type": "string", "enum": ["rudraksha", "tulsi", "sandalwood", "sphatik", "gold"] },
+        "targetMalas": { "type": "number" },
+        "currentBead": { "type": "number" },
+        "completedMalasToday": { "type": "number" },
+        "totalChantsLifetime": { "type": "number" },
+        "totalChantsToday": { "type": "number" },
+        "colorTheme": { "type": "string", "maxLength": 32 },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "lastChantedAt": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "mantraText", "targetMalas", "currentBead"]
+    },
+    "JaapEntry": {
+      "title": "JaapEntry",
+      "description": "Log entry of chants and completed malas recorded for a specific mala track",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "malaId": { "type": "string", "maxLength": 128 },
+        "mantraName": { "type": "string", "maxLength": 128 },
+        "count": { "type": "number" },
+        "malas": { "type": "number" },
+        "type": { "type": "string", "enum": ["live", "manual"] },
+        "timestamp": { "type": "number" },
+        "note": { "type": "string", "maxLength": 500 },
+        "deviceId": { "type": "string", "maxLength": 128 },
+        "deleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "malaId", "count", "malas", "type", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/malas/{malaId}": {
+      "schema": { "$ref": "#/entities/MalaTrack" },
+      "description": "Collection of concurrent Mala sadhana tracks owned by the authenticated user"
+    },
+    "/users/{userId}/entries/{entryId}": {
+      "schema": { "$ref": "#/entities/JaapEntry" },
+      "description": "Collection of chant logs associated with user malas"
+    }
+  }
+}
